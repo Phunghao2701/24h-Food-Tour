@@ -1,156 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, X, Sparkle, Compass, MapPin, DollarSign, Star, Navigation, Zap } from 'lucide-react';
-import Button from '../ui/Button';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, X, Sparkle, MapPin, Send, RefreshCw, Bot } from 'lucide-react';
 import { useConcierge } from '../../context/ConciergeContext';
-import { getSmartRecommendations, calculateDistance } from '../../utils/engine';
+import { initGemini, sendMessage, resetChat } from '../../services/gemini';
 import { useLocation } from 'react-router-dom';
 
-const AIConcierge = () => {
-  const { isConsulting, startConsultation, endConsultation } = useConcierge();
-  const location = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
-  const [step, setStep] = useState('welcome'); // welcome, filters, results
-  const [filters, setFilters] = useState({ mode: 'All', budget: 'All' });
-  const [recommendations, setRecommendations] = useState(null);
+// --- Constants ---
+const USER_LOC = [10.8411, 106.8100]; // FPT University default
+const LOCATION_LABEL = 'Quận 9 (FPTU)';
 
-  // Auto-trigger on Map page
+const QUICK_REPLIES = [
+  { label: '🍜 Muốn ăn no', text: 'Tôi đang đói và muốn ăn một bữa no, gợi ý chỗ nào ngon gần đây không?' },
+  { label: '☕ Ngồi cafe code', text: 'Tôi muốn tìm quán cafe để ngồi làm việc / học bài, có wifi ổn, mở muộn.' },
+  { label: '🌙 Đang đêm khuya', text: 'Đang đêm khuya rồi, có chỗ nào còn mở không?' },
+  { label: '💸 Ví hẹp', text: 'Tôi cần chỗ ăn ngon mà giá rẻ, sinh viên thôi.' },
+  { label: '🔥 Điểm ẩn nào hay?', text: 'Có quán nào là hidden gem, ít người biết nhưng ngon không?' },
+];
+
+// --- Sub-components ---
+const TypingDots = () => (
+  <div className="flex gap-1 items-center px-4 py-3">
+    <div className="w-2 h-2 bg-warm-silver rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+    <div className="w-2 h-2 bg-warm-silver rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+    <div className="w-2 h-2 bg-warm-silver rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+  </div>
+);
+
+const ChatBubble = ({ msg }) => {
+  const isBot = msg.role === 'bot';
+  return (
+    <div className={`flex gap-3 ${isBot ? '' : 'flex-row-reverse'} animate-fade-in`}>
+      {isBot && (
+        <div className="w-8 h-8 rounded-full bg-clay-black flex-shrink-0 flex items-center justify-center mt-1">
+          <Bot size={16} className="text-slushie-500" />
+        </div>
+      )}
+      <div
+        className={`max-w-[80%] px-4 py-3 rounded-feature text-sm leading-relaxed whitespace-pre-wrap ${
+          isBot
+            ? 'bg-clay-white border border-oat-border text-warm-charcoal rounded-tl-none shadow-sm'
+            : 'bg-clay-black text-clay-white rounded-tr-none'
+        }`}
+      >
+        {msg.text}
+      </div>
+    </div>
+  );
+};
+
+// --- Main Component ---
+const AIConcierge = () => {
+  const { startConsultation, endConsultation } = useConcierge();
+  const routerLocation = useLocation();
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [error, setError] = useState(null);
+
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Auto-scroll to latest message
   useEffect(() => {
-    if (location.pathname === '/map' && !isOpen) {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  // Auto-open on /map page
+  useEffect(() => {
+    if (routerLocation.pathname === '/map' && !isOpen) {
       const timer = setTimeout(() => {
         setIsOpen(true);
         startConsultation();
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [location.pathname]);
+  }, [routerLocation.pathname]);
 
-  const handleStartConsultation = () => {
-    setStep('filters');
-  };
+  // Initialize Gemini when panel opens
+  useEffect(() => {
+    if (!isOpen || isReady) return;
 
-  const handleFinishFilters = () => {
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    // FPT University anchor as per dynamic-routing.md
-    const userLoc = [10.8411, 106.8100]; 
-    const recs = getSmartRecommendations(timeStr, 'All', filters.mode, filters.budget, userLoc);
-    setRecommendations(recs);
-    setStep('results');
-    endConsultation(); // Light up map
+
+    try {
+      initGemini(USER_LOC, timeStr, LOCATION_LABEL);
+      setIsReady(true);
+      setError(null);
+
+      // Proactive greeting as first bot message
+      const hour = now.getHours();
+      let greeting = '';
+      if (hour >= 5 && hour < 11) greeting = `🌅 Chào buổi sáng! Mình là Chú Ổi — trợ lý ẩm thực 24h của bạn. Bạn đang ở gần **${LOCATION_LABEL}**. Sáng nay muốn ăn gì?`;
+      else if (hour >= 11 && hour < 14) greeting = `☀️ Chào buổi trưa! Mình là Chú Ổi. Đang ở **${LOCATION_LABEL}** rồi, trưa nay ăn gì ngon nào?`;
+      else if (hour >= 14 && hour < 19) greeting = `⛅ Chào buổi chiều! Mình là Chú Ổi. Bạn đang ở gần **${LOCATION_LABEL}** — chiều mát rồi, muốn ăn vặt hay ngồi cafe?`;
+      else if (hour >= 19 && hour < 22) greeting = `🌆 Chào buổi tối! Mình là Chú Ổi. Tối nay ở **${LOCATION_LABEL}** muốn ăn gì? Tối nay mình có vài gợi ý xịn đây!`;
+      else greeting = `🌙 Chào đêm khuya! Mình là Chú Ổi. ${hour >= 0 && hour < 4 ? 'Thức khuya như này' : 'Đêm muộn rồi'} mà vẫn đói hả? Ở **${LOCATION_LABEL}** vẫn còn chỗ đấy!`;
+
+      setMessages([{ role: 'bot', text: greeting }]);
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [isOpen]);
+
+  const handleSend = async (text) => {
+    const messageText = text || input.trim();
+    if (!messageText || isTyping || !isReady) return;
+
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: messageText }]);
+    setIsTyping(true);
+
+    try {
+      const response = await sendMessage(messageText);
+      setMessages(prev => [...prev, { role: 'bot', text: response }]);
+    } catch (e) {
+      console.error('[Concierge] Chat error:', e);
+      setMessages(prev => [...prev, {
+        role: 'bot',
+        text: `😓 Có lỗi xảy ra: ${e.message}\n\nNhấn 🔄 để thử lại hoặc reload trang.`
+      }]);
+    } finally {
+      setIsTyping(false);
+      inputRef.current?.focus();
+    }
   };
 
-  const renderStep = () => {
-    switch (step) {
-      case 'welcome':
-        return (
-          <div className="space-y-8 animate-fade-in">
-            <div className="bg-clay-white p-6 rounded-feature border-2 border-clay-black shadow-clay">
-               <h4 className="text-2xl font-bold mb-4 tracking-tight">Chào bạn! 🇻🇳</h4>
-               <p className="text-warm-charcoal leading-relaxed mb-6">
-                 Bây giờ là 3 giờ chiều, trời Sài Gòn đang khá nóng. Mình thấy gần bạn có quán <strong>Trà dâu Đông Du</strong> cực mát hoặc <strong>Bánh tráng trộn chú Viên</strong> đang mở cửa.
-               </p>
-               <Button onClick={handleStartConsultation} className="w-full">
-                 Giúp mình chọn món!
-               </Button>
-            </div>
-          </div>
-        );
-
-      case 'filters':
-        return (
-          <div className="space-y-10 animate-fade-in">
-             <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-warm-silver mb-4 block">Bạn muốn ăn gì?</label>
-                <div className="grid grid-cols-2 gap-4">
-                   {['Snack', 'Meal'].map(m => (
-                     <button
-                       key={m}
-                       onClick={() => setFilters({ ...filters, mode: m })}
-                       className={`py-6 rounded-card border-2 font-bold transition-all ${filters.mode === m ? 'bg-matcha-600 border-clay-black text-clay-white shadow-clay' : 'bg-clay-white border-oat-border text-warm-charcoal'}`}
-                     >
-                       {m === 'Snack' ? 'Ăn vặt' : 'Ăn no'}
-                     </button>
-                   ))}
-                </div>
-             </div>
-
-             <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-warm-silver mb-4 block">Ngân sách của bạn?</label>
-                <div className="grid grid-cols-3 gap-3">
-                   {['$', '$$', '$$$'].map(b => (
-                     <button
-                       key={b}
-                       onClick={() => setFilters({ ...filters, budget: b })}
-                       className={`py-4 rounded-card border-2 font-bold transition-all ${filters.budget === b ? 'bg-slushie-500 border-clay-black text-clay-white shadow-clay' : 'bg-clay-white border-oat-border text-warm-charcoal'}`}
-                     >
-                       {b}
-                     </button>
-                   ))}
-                </div>
-             </div>
-
-             <Button onClick={handleFinishFilters} className="w-full py-6 text-lg bg-clay-black text-clay-white shadow-clay">
-               Xem gợi ý của mình!
-             </Button>
-          </div>
-        );
-
-      case 'results':
-        return (
-          <div className="space-y-6 animate-fade-in">
-             <div className="flex items-center gap-2 text-matcha-600 font-bold uppercase tracking-widest text-[10px] mb-2">
-                <Zap size={14} /> My Top 3 for you
-             </div>
-
-             {/* Distance Warning Banner */}
-             {recommendations && Object.values(recommendations).some(v => v && calculateDistance(v.coord, [10.8411, 106.8100]) > 5000) && (
-               <div className="bg-pomegranate-50 border border-pomegranate-200 rounded-card p-4 flex items-start gap-3 animate-pulse-soft">
-                  <div className="p-1 bg-pomegranate-100 rounded-full text-pomegranate-600"><Compass size={16} /></div>
-                  <div>
-                    <p className="text-xs font-bold text-pomegranate-800">This is a bit far!</p>
-                    <p className="text-[10px] text-pomegranate-600">Some spots are 5km away. Do you still want to go?</p>
-                  </div>
-               </div>
-             )}
-             
-             {recommendations && Object.entries(recommendations).map(([type, venue]) => (
-               venue && (
-                 <div key={type} className="bg-clay-white border-2 border-clay-black rounded-feature p-6 shadow-clay hover:translate-y-[-2px] transition-transform">
-                    <div className="flex justify-between items-start mb-4">
-                       <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded-pill ${
-                         type === 'timeSpecial' ? 'bg-pomegranate-100 text-pomegranate-600' : 
-                         type === 'nearest' ? 'bg-matcha-100 text-matcha-600' : 'bg-slushie-100 text-slushie-800'
-                       }`}>
-                         {type === 'timeSpecial' ? 'Best Match' : type === 'nearest' ? 'Nearest' : 'Hidden Gem'}
-                       </span>
-                       <div className="flex items-center gap-1 text-xs font-bold ring-1 ring-oat-border px-1.5 py-0.5 rounded-badge">
-                          <Star size={10} fill="#facc15" stroke="none" /> {venue.review_score}
-                       </div>
-                    </div>
-                    <h5 className="text-xl font-bold mb-2">{venue.name}</h5>
-                    <p className="text-xs text-warm-silver mb-4 line-clamp-2">{venue.summary}</p>
-                    <div className="flex items-center justify-between mt-4">
-                       <span className="text-[10px] font-bold text-warm-charcoal uppercase">{venue.price_range} • {venue.district}</span>
-                       <button className="text-matcha-600 hover:text-matcha-700 font-bold text-xs flex items-center gap-1">
-                         Detail <Navigation size={12} />
-                       </button>
-                    </div>
-                 </div>
-               )
-             ))}
-
-             <button 
-               onClick={() => setStep('filters')}
-               className="w-full py-4 text-[10px] font-bold uppercase tracking-widest text-warm-silver hover:text-clay-black transition-colors"
-             >
-               Đổi lựa chọn khác
-             </button>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+  const handleReset = () => {
+    resetChat();
+    setIsReady(false);
+    setMessages([]);
+    setError(null);
+    // Re-trigger init
+    setTimeout(() => setIsOpen(prev => { return prev; }), 100);
   };
 
   const handleClose = () => {
@@ -158,60 +142,137 @@ const AIConcierge = () => {
     endConsultation();
   };
 
+  const handleOpen = () => {
+    setIsOpen(true);
+    startConsultation();
+  };
+
   return (
     <>
+      {/* FAB Button */}
       <div className="fixed bottom-6 right-6 lg:bottom-12 lg:right-12 z-[60] flex flex-col items-end gap-3">
-         {!isOpen && (
-           <div className="bg-clay-white border-2 border-clay-black px-4 py-2 rounded-card shadow-clay text-[10px] font-bold uppercase tracking-widest animate-fade-in animate-slide-up">
-             Hungry? I'm right here! ✨
-           </div>
-         )}
-         <button
-           onClick={() => { setIsOpen(true); if (step === 'welcome' || step === 'filters') startConsultation(); }}
-           className={`w-14 h-14 rounded-full bg-clay-black text-clay-white flex items-center justify-center shadow-2xl border-2 border-matcha-600 group overflow-hidden transition-transform active:scale-90 hover:scale-110 ${!isOpen ? 'animate-pulse-soft' : ''}`}
-         >
-           <Sparkles size={24} className="relative z-10" />
-           <div className="absolute inset-0 bg-gradient-to-tr from-matcha-600 to-slushie-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-         </button>
+        {!isOpen && (
+          <div className="bg-clay-white border-2 border-clay-black px-4 py-2 rounded-card shadow-clay text-[10px] font-bold uppercase tracking-widest animate-fade-in">
+            Đói chưa? Hỏi mình đi! 🍜
+          </div>
+        )}
+        <button
+          onClick={handleOpen}
+          className={`w-14 h-14 rounded-full bg-clay-black text-clay-white flex items-center justify-center shadow-2xl border-2 border-matcha-600 group overflow-hidden transition-transform active:scale-90 hover:scale-110 ${!isOpen ? 'animate-pulse-soft' : ''}`}
+        >
+          <Sparkles size={24} className="relative z-10" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-matcha-600 to-slushie-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        </button>
       </div>
 
-      <div 
+      {/* Backdrop */}
+      <div
         onClick={handleClose}
         className={`fixed inset-0 z-[100] bg-clay-black/20 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-      ></div>
-      
+      />
+
+      {/* Chat Panel */}
       <div
         className={`fixed right-0 top-0 bottom-0 w-full max-w-md bg-warm-cream border-l border-oat-border shadow-2xl z-[110] flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
-        <div className="p-8 border-b border-oat-border bg-clay-black text-clay-white flex justify-between items-center relative overflow-hidden">
-          <div className="relative z-10">
-            <h3 className="text-xl font-bold flex items-center gap-2">
-              <Sparkle size={20} className="text-slushie-500" /> AI Concierge
+        {/* Header */}
+        <div className="p-6 border-b border-oat-border bg-clay-black text-clay-white flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Sparkle size={18} className="text-slushie-500" /> Chú Ổi 🌶️
             </h3>
-            <p className="text-[10px] uppercase font-bold tracking-wide-label opacity-60">Your Soulful Guide</p>
-          </div>
-          <button 
-            onClick={handleClose}
-            className="relative z-10 p-2 hover:bg-clay-white/10 rounded-full transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-10">
-            <div className="mb-6 flex items-center gap-2 bg-oat-light/50 border border-oat-border rounded-pill px-3 py-1.5 w-fit">
-               <MapPin size={12} className="text-matcha-600" />
-               <span className="text-[10px] font-bold uppercase tracking-wide-label text-warm-charcoal">
-                 Current Location: <span className="text-clay-black">District 9 (FPTU)</span>
-               </span>
+            <div className="flex items-center gap-2 mt-1">
+              <MapPin size={10} className="text-matcha-400" />
+              <span className="text-[10px] uppercase font-bold tracking-wide-label opacity-70">
+                {LOCATION_LABEL}
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-matcha-400 animate-pulse" />
             </div>
-            {renderStep()}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReset}
+              title="Bắt đầu lại"
+              className="p-2 hover:bg-clay-white/10 rounded-full transition-colors"
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button onClick={handleClose} className="p-2 hover:bg-clay-white/10 rounded-full transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        <div className="p-8 border-t border-oat-border bg-oat-light/20 text-center">
-            <p className="text-[10px] text-warm-silver font-bold uppercase tracking-widest">
-               Powered by 24h Food Intelligence
-            </p>
+        {/* Error State */}
+        {error && (
+          <div className="p-4 bg-pomegranate-50 border-b border-pomegranate-200 text-xs text-pomegranate-800 font-bold">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.map((msg, i) => (
+            <ChatBubble key={i} msg={msg} />
+          ))}
+          {isTyping && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-clay-black flex-shrink-0 flex items-center justify-center">
+                <Bot size={16} className="text-slushie-500" />
+              </div>
+              <div className="bg-clay-white border border-oat-border rounded-feature rounded-tl-none shadow-sm">
+                <TypingDots />
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Quick Replies */}
+        {messages.length <= 1 && !isTyping && isReady && (
+          <div className="px-4 pb-3 flex gap-2 overflow-x-auto no-scrollbar">
+            {QUICK_REPLIES.map((qr) => (
+              <button
+                key={qr.label}
+                onClick={() => handleSend(qr.text)}
+                className="flex-shrink-0 px-3 py-1.5 bg-clay-white border border-oat-border rounded-pill text-[11px] font-bold text-warm-charcoal hover:bg-clay-black hover:text-clay-white hover:border-clay-black transition-all"
+              >
+                {qr.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Input Area */}
+        <div className="p-4 border-t border-oat-border bg-clay-white">
+          <div className="flex gap-3 items-end">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Hỏi Chú Ổi bất cứ điều gì..."
+              rows={1}
+              disabled={!isReady || isTyping}
+              className="flex-1 resize-none bg-oat-light border border-oat-border rounded-card py-2.5 px-4 text-sm focus:outline-none focus:border-matcha-600 disabled:opacity-50 transition-colors max-h-28"
+              style={{ lineHeight: '1.5' }}
+            />
+            <button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || !isReady || isTyping}
+              className="w-10 h-10 rounded-full bg-clay-black text-clay-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-matcha-700 transition-colors active:scale-90"
+            >
+              <Send size={16} />
+            </button>
+          </div>
+          <p className="text-[9px] text-warm-silver text-center mt-2 uppercase tracking-widest font-bold">
+            Powered by Gemini AI · 24h Food Intelligence
+          </p>
         </div>
       </div>
     </>
@@ -219,4 +280,3 @@ const AIConcierge = () => {
 };
 
 export default AIConcierge;
-
