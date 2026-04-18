@@ -1,15 +1,35 @@
 ---
-description: Workflow expectations and guidelines for AI coding assistants working in this repository.
+description: Multi-Agent orchestration strategy for the 24h Food Tour project - From premium aesthetics to autonomous data management.
 globs: "*"
 ---
-# Instructions for AI Assistants
-- Before creating a new component, cross-reference styling with the `DESIGN.md` explicitly.
-- **NEVER use generic Tailwind styles** like `bg-gray-100` or `shadow-md`. You must configure Tailwind to use the exact colors and custom shadows defined in the workspace (`bg-warm-cream`, `shadow-clay`).
-- If you need a placeholder image, always generate a high-quality relevant image instead of using generic gray blocks or external placeholder APIs (unless specifically asked).
-- Your goal is to WOW the user with a stunning, premium aesthetic. Avoid building simple MVP-looking sub-pages.
 
-## Agent Orchestration & Communication
-- **Frontend Agent**: When requesting a new component or UI update, you MUST automatically cross-reference `.claude/rules/design-system.mdc` to ensure color palette, typography, and shadow tokens are perfectly aligned.
-- **Backend Agent**: When the Frontend agent requests a data-heavy feature (e.g., Tour Planning), you MUST consult the relevant file in `.claude/skills/` (like `dynamic-routing.md`) to provide optimized logic.
-- **Project Manager**: Act as the arbiter of "Sprint Logic". Ensure that all agents follow the patterns defined in the `.claude/` architecture files.
-- **Verification**: Every major task completion must be verified against the corresponding agent persona (`.claude/agents/*.md`) and core rules (`.claude/rules/*.md`).
+# 🤖 Core Workflow: The "Concierae" Autopilot
+
+Every action taken by the AI Assistant must revolve around one goal: **"Don't make the user choose; suggest the perfect itinerary based on real-time context."**
+
+## 1. Data Autopilot (Zero-Manual Entry)
+- **Backend & Scraper Agents**: Strictly minimize requests for manual data entry into `mockData.js`.
+    - When a data task is assigned, trigger the `content-scraper-curator.md` skill immediately.
+    - Automatically map raw findings into the `ITINERARIES` schema within `engine.js`.
+    - **Validation**: Every new location must be cross-verified for valid `lat/lng` coordinates and real-time `isOpen` status (via Google/Mapbox/Search) before being committed to the database.
+
+## 2. Dynamic Intelligence (Logic-First)
+- **Agent Orchestration**: 
+    - When the Frontend Agent requests a Tour display, the Backend Agent MUST proactively reference `dynamic-routing.md` and `weather-adaptation.md` to filter data instead of returning a static list.
+    - Always inject "Current Time" logic into every recommendation: **"It is currently ${hour}h, suggest the most relevant meal category."**
+
+## 3. UI/UX "Stunning & Interactive"
+- **The Concierae Interaction**: The `Concierae.jsx` component is the heart of the app. It must never be static.
+    - The AI must autonomously generate personalized greetings (e.g., "Hey FPTU student, craving a late-night snack in District 9?") based on the `ui-ux-designer.md` persona.
+- **Styling**: Strict adherence to `DESIGN.md`. All new components must support `Dark Mode` by default to accommodate late-night food explorers.
+
+## 4. Agent Personas & Skill Mapping
+- **Frontend Agent**: Responsible for transforming automatically generated tours into high-end visual experiences. Reference `design-system.mdc`.
+- **Backend Agent**: Acts as the "Warehouse Manager." Use `database.md` to clean and enrich data from external sources.
+- **QA Agent**: Automatically verify image links and coordinates on the Vercel deployment. If a venue is flagged as "Permanently Closed," report and remove it from the database immediately.
+
+## 5. Verification Protocol
+Before marking any task as complete, the Agent must verify:
+1. "Does this data accurately reflect the user's current local time?"
+2. "Is this interface 'Premium' enough and easy to navigate for someone who is hungry?"
+3. "Is there a step I can automate instead of asking the user to provide data manually?"

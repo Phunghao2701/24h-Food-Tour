@@ -1,18 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Search, Filter, Info, Navigation, Smartphone } from 'lucide-react';
 import { VENUES } from '../utils/mockData';
 import Button from '../components/ui/Button';
+import { isVenueOpen } from '../utils/engine';
+import { useConcierge } from '../context/ConciergeContext';
 
 const MapPage = () => {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [filter, setFilter] = useState('All');
+  const [isOpenNowOnly, setIsOpenNowOnly] = useState(false);
+  const [currentTime, setCurrentTime] = useState('08:00');
 
-  const filteredVenues = filter === 'All' 
-    ? VENUES 
-    : VENUES.filter(v => v.category === filter);
+  const { focusConfig } = useConcierge();
+
+  useEffect(() => {
+    const now = new Date();
+    setCurrentTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+  }, []);
+
+  const filteredVenues = VENUES.filter(v => {
+    const isCategoryMatch = filter === 'All' || v.category === filter;
+    const isTimeMatch = !isOpenNowOnly || isVenueOpen(v, currentTime);
+    return isCategoryMatch && isTimeMatch;
+  });
 
   return (
-    <div className="h-[calc(100vh-81px)] lg:h-screen flex flex-col lg:flex-row overflow-hidden bg-oat-light/30">
+    <div 
+      className={`h-[calc(100vh-81px)] lg:h-screen flex flex-col lg:flex-row overflow-hidden transition-all duration-700 ${focusConfig.blur ? 'blur-[4px] pointer-events-none' : ''}`}
+      style={{ opacity: focusConfig.opacity }}
+    >
       {/* Sidebar Content */}
       <div className="w-full lg:w-96 bg-warm-cream border-r border-oat-border flex flex-col shadow-xl z-20">
         <div className="p-6 border-b border-oat-border">
@@ -25,7 +41,7 @@ const MapPage = () => {
               className="w-full bg-clay-white border border-oat-border rounded-card py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-matcha-600"
             />
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-4">
             {['All', 'Hidden Gem', 'Fine Dining', 'Street Food'].map(cat => (
               <button
                 key={cat}
@@ -39,6 +55,20 @@ const MapPage = () => {
                 {cat}
               </button>
             ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsOpenNowOnly(!isOpenNowOnly)}
+              className={`flex-1 py-2 rounded-card border-2 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                isOpenNowOnly 
+                ? 'bg-matcha-100 border-matcha-600 text-matcha-800' 
+                : 'bg-clay-white border-oat-border text-warm-silver'
+              }`}
+            >
+              <div className={`w-2 h-2 rounded-full ${isOpenNowOnly ? 'bg-matcha-600 animate-pulse' : 'bg-warm-silver'}`}></div>
+              Open Now
+            </button>
           </div>
         </div>
 

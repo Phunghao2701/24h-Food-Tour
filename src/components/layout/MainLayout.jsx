@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, Compass, Map, User, Users, Search } from 'lucide-react';
 import AIConcierge from '../AI/Concierge';
+import { ConciergeProvider } from '../../context/ConciergeContext';
 
 const MainLayout = () => {
   const navItems = [
@@ -12,7 +13,8 @@ const MainLayout = () => {
   ];
 
   return (
-    <div className="flex min-h-screen bg-warm-cream">
+    <ConciergeProvider>
+      <div className="flex min-h-screen bg-warm-cream text-clay-black font-sans antialiased">
       {/* Sidebar - Desktop */}
       <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-oat-border bg-warm-cream p-6 lg:flex shadow-[0_0_20px_rgba(250,249,247,0.5)]">
         <div className="mb-12 flex items-center gap-2">
@@ -95,7 +97,8 @@ const MainLayout = () => {
         ))}
       </nav>
       <AIConcierge />
-    </div>
+      </div>
+    </ConciergeProvider>
   );
 };
 
