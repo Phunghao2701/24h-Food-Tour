@@ -101,7 +101,15 @@ function updateMockDataFile(venues) {
     const idMatches = existingVenuesStr.match(/id: (\d+)/g);
     let maxId = idMatches ? Math.max(...idMatches.map(m => parseInt(m.split(': ')[1]))) : 0;
 
-    const filteredVenues = venues.filter(v => !existingNames.includes(v.name)).slice(0, 10); // Limit to 10 for sanity
+    const GENERIC_NAMES = ['restaurant', 'cafe', 'coffee', 'coffee shop', 'quán ăn', 'quán cà phê', 'bakery', 'fast food'];
+    
+    const filteredVenues = venues.filter(v => {
+      const nameLower = v.name.toLowerCase().trim();
+      const isGeneric = GENERIC_NAMES.includes(nameLower);
+      const isTooShort = v.name.length < 3;
+      const alreadyExists = existingNames.includes(v.name);
+      return !alreadyExists && !isGeneric && !isTooShort;
+    }).slice(0, 10);
 
     if (filteredVenues.length === 0) {
        console.log('✨ No new OSM venues to add.');

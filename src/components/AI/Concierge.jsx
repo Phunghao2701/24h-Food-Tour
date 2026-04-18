@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, X, Sparkle, Compass, MapPin, DollarSign, Star, Navigation, Zap } from 'lucide-react';
 import Button from '../ui/Button';
 import { useConcierge } from '../../context/ConciergeContext';
-import { getSmartRecommendations } from '../../utils/engine';
+import { getSmartRecommendations, calculateDistance } from '../../utils/engine';
 import { useLocation } from 'react-router-dom';
 
 const AIConcierge = () => {
@@ -31,7 +31,9 @@ const AIConcierge = () => {
   const handleFinishFilters = () => {
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const recs = getSmartRecommendations(timeStr, 'All', filters.mode, filters.budget);
+    // FPT University anchor as per dynamic-routing.md
+    const userLoc = [10.8411, 106.8100]; 
+    const recs = getSmartRecommendations(timeStr, 'All', filters.mode, filters.budget, userLoc);
     setRecommendations(recs);
     setStep('results');
     endConsultation(); // Light up map
@@ -99,6 +101,17 @@ const AIConcierge = () => {
              <div className="flex items-center gap-2 text-matcha-600 font-bold uppercase tracking-widest text-[10px] mb-2">
                 <Zap size={14} /> My Top 3 for you
              </div>
+
+             {/* Distance Warning Banner */}
+             {recommendations && Object.values(recommendations).some(v => v && calculateDistance(v.coord, [10.8411, 106.8100]) > 5000) && (
+               <div className="bg-pomegranate-50 border border-pomegranate-200 rounded-card p-4 flex items-start gap-3 animate-pulse-soft">
+                  <div className="p-1 bg-pomegranate-100 rounded-full text-pomegranate-600"><Compass size={16} /></div>
+                  <div>
+                    <p className="text-xs font-bold text-pomegranate-800">This is a bit far!</p>
+                    <p className="text-[10px] text-pomegranate-600">Some spots are 5km away. Do you still want to go?</p>
+                  </div>
+               </div>
+             )}
              
              {recommendations && Object.entries(recommendations).map(([type, venue]) => (
                venue && (
@@ -186,6 +199,12 @@ const AIConcierge = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-10">
+            <div className="mb-6 flex items-center gap-2 bg-oat-light/50 border border-oat-border rounded-pill px-3 py-1.5 w-fit">
+               <MapPin size={12} className="text-matcha-600" />
+               <span className="text-[10px] font-bold uppercase tracking-wide-label text-warm-charcoal">
+                 Current Location: <span className="text-clay-black">District 9 (FPTU)</span>
+               </span>
+            </div>
             {renderStep()}
         </div>
 

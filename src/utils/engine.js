@@ -40,58 +40,67 @@ export const getEmergencySuggestion = (timeStr, district = 'All') => {
 };
 
 /**
- * Simple pythagorean distance for mock coordinates
+ * Haversine formula for real-world distances in meters
  */
-const calculateDistance = (c1, c2) => {
-  if (!c1 || !c2) return 999;
-  return Math.sqrt(Math.pow(c1[0] - c2[0], 2) + Math.pow(c1[1] - c2[1], 2));
+export const calculateDistance = (c1, c2) => {
+  if (!c1 || !c2) return 9999;
+  const R = 6371e3; // Earth radius in meters
+  const [lat1, lon1] = c1;
+  const [lat2, lon2] = c2;
+  
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+  return R * c; // Distance in meters
 };
 
 /**
  * Advanced filtering following dynamic-routing.md priorities
  */
-export const getSmartRecommendations = (timeStr, district = 'All', mode = 'All', budget = 'All') => {
+export const getSmartRecommendations = (timeStr, district = 'All', mode = 'All', budget = 'All', userLoc = [10.8411, 106.8100]) => {
   // 1. Filter by Priority 1: Opening Hours
   let candidates = VENUES.filter(v => isVenueOpen(v, timeStr));
   
-  // 2. Filter by District if specified
+  // 2. Filter by 3KM RADIUS (dynamic-routing.md rule)
+  let proximityCandidates = candidates.filter(v => calculateDistance(v.coord, userLoc) <= 3000);
+
+  // Fallback to 5km if no spots found within 3km
+  if (proximityCandidates.length === 0) {
+    proximityCandidates = candidates.filter(v => calculateDistance(v.coord, userLoc) <= 5000);
+  }
+
+  candidates = proximityCandidates;
+
+  // 3. District Context (Safety check)
   if (district !== 'All') {
     candidates = candidates.filter(v => v.district === district);
   }
   
-  // 3. Match Budget ($ / $$ / $$$)
+  // 4. Match Budget ($ / $$ / $$$)
   if (budget !== 'All') {
     candidates = candidates.filter(v => v.price_range === budget);
   }
 
-  // 4. Match Mode (Street Food is usually 'Snack', Fine Dining/Gem is 'Meal' - Simplified)
-  // In a real app, we'd have a 'type' tag. For now:
+  // 5. Match Mode
   if (mode === 'Snack') {
     candidates = candidates.filter(v => v.category === 'Street Food');
   } else if (mode === 'Meal') {
     candidates = candidates.filter(v => v.category !== 'Street Food');
   }
 
-  // Generate 3 Distinct Types:
-  
-  // A. Time Specialist (Highest Review Score)
-  const timeSpecial = [...candidates]
-    .sort((a, b) => b.review_score - a.review_score)[0];
+  // Safety Sort
+  candidates.sort((a, b) => b.review_score - a.review_score);
 
-  // B. Nearest (Mocked center at District 1 [10.77, 106.70])
-  const nearest = [...candidates]
-    .sort((a, b) => calculateDistance(a.coord, [10.77, 106.70]) - calculateDistance(b.coord, [10.77, 106.70]))[0];
-
-  // C. Hidden Gem
-  const hiddenGems = candidates.filter(v => v.is_hidden_gem);
-  const hiddenGem = hiddenGems.length > 0 
-    ? hiddenGems[Math.floor(Math.random() * hiddenGems.length)]
-    : candidates[candidates.length - 1];
-
+  // Pick 3 Distinct Types:
   return {
-    timeSpecial,
-    nearest,
-    hiddenGem
+    timeSpecial: candidates[0] || null,
+    nearest: [...candidates].sort((a, b) => calculateDistance(a.coord, userLoc) - calculateDistance(b.coord, userLoc))[0] || null,
+    hiddenGem: candidates.find(v => v.is_hidden_gem) || candidates[Math.min(2, candidates.length - 1)] || null
   };
 };
 

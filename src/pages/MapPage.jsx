@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Search, Filter, Info, Navigation, Smartphone } from 'lucide-react';
+import { MapPin, Search, Filter, Info, Navigation, Smartphone, Plus } from 'lucide-react';
 import { VENUES } from '../utils/mockData';
 import Button from '../components/ui/Button';
-import { isVenueOpen } from '../utils/engine';
+import { isVenueOpen, calculateDistance } from '../utils/engine';
 import { useConcierge } from '../context/ConciergeContext';
+import SafeImage from '../components/ui/SafeImage';
 
 const MapPage = () => {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [filter, setFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isOpenNowOnly, setIsOpenNowOnly] = useState(false);
   const [currentTime, setCurrentTime] = useState('08:00');
 
@@ -21,7 +23,9 @@ const MapPage = () => {
   const filteredVenues = VENUES.filter(v => {
     const isCategoryMatch = filter === 'All' || v.category === filter;
     const isTimeMatch = !isOpenNowOnly || isVenueOpen(v, currentTime);
-    return isCategoryMatch && isTimeMatch;
+    const isSearchMatch = v.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         v.summary.toLowerCase().includes(searchQuery.toLowerCase());
+    return isCategoryMatch && isTimeMatch && isSearchMatch;
   });
 
   return (
@@ -37,6 +41,8 @@ const MapPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-silver" size={16} />
             <input 
               type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter by name or street..."
               className="w-full bg-clay-white border border-oat-border rounded-card py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-matcha-600"
             />
@@ -73,33 +79,57 @@ const MapPage = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <p className="text-[10px] uppercase font-bold tracking-wide-label text-warm-silver px-2">Nearby Venues (2km)</p>
-          {filteredVenues.map(venue => (
-            <div
-              key={venue.id}
-              onClick={() => setSelectedVenue(venue)}
-              className={`p-4 rounded-card border cursor-pointer transition-all duration-300 ${
-                selectedVenue?.id === venue.id 
-                ? 'bg-clay-white border-matcha-600 shadow-clay scale-[1.02]' 
-                : 'bg-clay-white border-oat-border hover:border-warm-silver hover:shadow-sm'
-              }`}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-bold text-lg">{venue.name}</h3>
-                <span className="text-[9px] font-bold uppercase tracking-wide-label bg-matcha-300 px-1.5 py-0.5 rounded-badge text-matcha-800">
-                  {venue.category}
-                </span>
+          <div className="flex justify-between items-center px-2">
+            <p className="text-[10px] uppercase font-bold tracking-wide-label text-warm-silver">Nearby Venues ({filteredVenues.length})</p>
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-[10px] font-bold text-matcha-600 hover:underline">Clear Search</button>
+            )}
+          </div>
+          
+          {filteredVenues.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 bg-oat-light rounded-full flex items-center justify-center mx-auto mb-4">
+                 <Search size={24} className="text-warm-silver" />
               </div>
-              <p className="text-sm text-warm-silver line-clamp-2 mb-3 leading-relaxed">{venue.summary}</p>
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wide-label">
-                <span className="text-matcha-600 flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-matcha-600 animate-pulse"></div> {venue.status}
-                </span>
-                <span className="text-warm-charcoal">400m away</span>
-              </div>
+              <p className="text-sm font-bold text-warm-charcoal">No venues found</p>
+              <p className="text-xs text-warm-silver">Try adjusting your filters or search term.</p>
             </div>
-          ))}
-        </div>
+          ) : (
+            filteredVenues.map(venue => {
+            const distance = calculateDistance(venue.coord, [10.778, 106.696]); // Mocked user at D1 center
+            return (
+              <div
+                key={venue.id}
+                onClick={() => setSelectedVenue(venue)}
+                className={`flex gap-4 p-4 rounded-card border cursor-pointer transition-all duration-300 ${
+                  selectedVenue?.id === venue.id 
+                  ? 'bg-clay-white border-matcha-600 shadow-clay scale-[1.02]' 
+                  : 'bg-clay-white border-oat-border hover:border-warm-silver hover:shadow-sm'
+                }`}
+              >
+                <div className="w-16 h-16 rounded-card overflow-hidden flex-shrink-0 bg-oat-light border border-oat-border">
+                  <SafeImage src={venue.image_url} alt={venue.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-bold text-sm truncate">{venue.name}</h3>
+                    <span className="text-[8px] font-bold uppercase tracking-tight bg-matcha-300 px-1.5 py-0.5 rounded-badge text-matcha-800">
+                      {venue.category}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-warm-silver line-clamp-1 mb-2 leading-tight">{venue.summary}</p>
+                  <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wide-label">
+                    <span className="text-matcha-600 flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-matcha-600 animate-pulse"></div> Active
+                    </span>
+                    <span className="text-warm-charcoal">{distance < 1000 ? `${Math.round(distance)}m` : `${(distance/1000).toFixed(1)}km`}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
       </div>
 
       {/* Main Map View */}
@@ -147,18 +177,25 @@ const MapPage = () => {
            </div>
         </div>
 
-        {/* Selection Detail Overlay (Mobile) / Card (Desktop) */}
         {selectedVenue && (
           <div
-            className="absolute bottom-6 left-6 right-6 lg:left-auto lg:w-[400px] bg-warm-cream rounded-feature p-8 border border-oat-border shadow-2xl z-40 animate-slide-up"
+            className="absolute bottom-6 left-6 right-6 lg:left-auto lg:w-[400px] bg-warm-cream rounded-feature overflow-hidden border border-oat-border shadow-2xl z-40 animate-slide-up"
           >
-            <button 
-              onClick={() => setSelectedVenue(null)}
-              className="absolute right-4 top-4 text-warm-silver hover:text-clay-black transition-colors"
-            >
-              Close
-            </button>
-            <div className="mb-6">
+            <div className="relative h-48 w-full bg-oat-light">
+              <SafeImage 
+                 src={selectedVenue.image_url} 
+                 alt={selectedVenue.name} 
+                 className="w-full h-full object-cover" 
+              />
+              <button 
+                onClick={() => setSelectedVenue(null)}
+                className="absolute right-4 top-4 bg-clay-black/40 backdrop-blur-md p-2 rounded-full text-clay-white hover:bg-clay-black transition-colors"
+              >
+                <Plus className="rotate-45" size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8">
               <span className="text-[10px] font-bold tracking-wide-label uppercase text-matcha-600 mb-2 block">Featured {selectedVenue.category}</span>
               <h2 className="text-3xl font-bold mb-4">{selectedVenue.name}</h2>
               <p className="text-warm-charcoal leading-relaxed mb-6">{selectedVenue.summary}</p>

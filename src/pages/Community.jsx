@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users, Video, Heart, MessageCircle, MapPin, Plus } from 'lucide-react';
 import Button from '../components/ui/Button';
+import SafeImage from '../components/ui/SafeImage';
 
 const Community = () => {
   const matches = [
@@ -85,7 +86,7 @@ const Community = () => {
                       <Button variant="ghost" className="p-1 h-auto"><Plus size={16} /></Button>
                    </div>
                    <div className="aspect-[4/5] bg-oat-light relative">
-                      <img src={post.img} alt="food" className="w-full h-full object-cover" />
+                      <SafeImage src={post.img} alt="food" className="w-full h-full object-cover" />
                       <div className="absolute top-4 right-4 bg-clay-black/40 backdrop-blur-md px-2 py-1 rounded-badge text-[10px] text-clay-white font-bold uppercase flex items-center gap-1">
                         <Video size={12} /> Live Now
                       </div>
