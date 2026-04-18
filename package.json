@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "data:scrape": "node scripts/scraper.js"
+    "data:scrape": "node scripts/scraper.js",
+    "data:scrape:go-vap": "node scripts/scraper.js go-vap"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,5 +1,41 @@
 import { VENUES } from './mockData';
 
+export const getBudgetLabel = (budgetTier) => {
+  if (budgetTier === '$') return 'Tiết kiệm';
+  if (budgetTier === '$$') return 'Tầm trung';
+  if (budgetTier === '$$$') return 'Rộng rãi';
+  return 'Linh hoạt';
+};
+
+export const getBudgetRange = (venue) => {
+  if (venue.price_min && venue.price_max) {
+    return { min: venue.price_min, max: venue.price_max };
+  }
+
+  if (venue.price_range === '$') return { min: 25000, max: 90000 };
+  if (venue.price_range === '$$$') return { min: 180000, max: 400000 };
+  return { min: 70000, max: 180000 };
+};
+
+export const formatPriceRange = (venue) => {
+  const range = getBudgetRange(venue);
+  return `${range.min.toLocaleString('vi-VN')}đ - ${range.max.toLocaleString('vi-VN')}đ`;
+};
+
+export const inferVenueKind = (venue) => {
+  if (venue.venue_kind) return venue.venue_kind;
+  const source = `${venue.name} ${venue.summary}`.toLowerCase();
+  return /(cafe|coffee|tea|trà|sinh tố|juice|milk tea)/.test(source) ? 'Nước uống' : 'Đồ ăn';
+};
+
+export const inferServingStyle = (venue) => {
+  if (venue.serving_style) return venue.serving_style;
+  const source = `${venue.name} ${venue.summary}`.toLowerCase();
+  if (/(phở|bún|hủ tiếu|mì|lẩu|cháo|nước|soup|noodle)/.test(source)) return 'Món nước';
+  if (/(cơm|bánh mì|nướng|chiên|khô|snack|bakery|fried|grill)/.test(source)) return 'Món khô';
+  return 'Linh hoạt';
+};
+
 /**
  * Checks if a venue is open at a specific time string (HH:mm)
  */
@@ -62,45 +98,77 @@ export const calculateDistance = (c1, c2) => {
 /**
  * Advanced filtering following dynamic-routing.md priorities
  */
-export const getSmartRecommendations = (timeStr, district = 'All', mode = 'All', budget = 'All', userLoc = [10.8411, 106.8100]) => {
-  // 1. Filter by Priority 1: Opening Hours
-  let candidates = VENUES.filter(v => isVenueOpen(v, timeStr));
-  
-  // 2. Filter by 3KM RADIUS (dynamic-routing.md rule)
-  let proximityCandidates = candidates.filter(v => calculateDistance(v.coord, userLoc) <= 3000);
+export const getSmartRecommendations = ({
+  timeStr,
+  district = 'All',
+  mode = 'All',
+  budget = 'All',
+  userLoc = [10.8411, 106.8100],
+  radiusKm = 5,
+  partySize = 2,
+  weatherMode = 'neutral',
+  venueKind = 'All',
+  servingStyle = 'All',
+}) => {
+  let candidates = VENUES.filter((venue) => isVenueOpen(venue, timeStr));
 
-  // Fallback to 5km if no spots found within 3km
-  if (proximityCandidates.length === 0) {
-    proximityCandidates = candidates.filter(v => calculateDistance(v.coord, userLoc) <= 5000);
+  let proximityCandidates = candidates.filter((venue) => calculateDistance(venue.coord, userLoc) <= radiusKm * 1000);
+
+  if (proximityCandidates.length === 0 && radiusKm < 10) {
+    proximityCandidates = candidates.filter((venue) => calculateDistance(venue.coord, userLoc) <= 10000);
   }
 
   candidates = proximityCandidates;
 
-  // 3. District Context (Safety check)
   if (district !== 'All') {
-    candidates = candidates.filter(v => v.district === district);
+    candidates = candidates.filter((venue) => venue.district === district);
   }
   
-  // 4. Match Budget ($ / $$ / $$$)
   if (budget !== 'All') {
-    candidates = candidates.filter(v => v.price_range === budget);
+    candidates = candidates.filter((venue) => venue.price_range === budget);
   }
 
-  // 5. Match Mode
+  if (venueKind !== 'All') {
+    candidates = candidates.filter((venue) => inferVenueKind(venue) === venueKind);
+  }
+
+  if (servingStyle !== 'All') {
+    candidates = candidates.filter((venue) => {
+      const normalizedStyle = inferServingStyle(venue);
+      return normalizedStyle === 'Linh hoạt' || normalizedStyle === servingStyle;
+    });
+  }
+
   if (mode === 'Snack') {
-    candidates = candidates.filter(v => v.category === 'Street Food');
+    candidates = candidates.filter((venue) => venue.category === 'Street Food');
   } else if (mode === 'Meal') {
-    candidates = candidates.filter(v => v.category !== 'Street Food');
+    candidates = candidates.filter((venue) => venue.category !== 'Street Food');
   }
 
-  // Safety Sort
-  candidates.sort((a, b) => b.review_score - a.review_score);
+  const scoreVenue = (venue) => {
+    const distanceScore = userLoc ? Math.max(0, 2 - calculateDistance(venue.coord, userLoc) / 3000) : 0;
+    const weatherText = `${venue.name} ${venue.summary}`.toLowerCase();
+    const hasCoolVibe = /coffee|cafe|tea|quiet|spacious|vintage|workspace|co-working/.test(weatherText);
+    const isIndoorLean = venue.category === 'Hidden Gem' || venue.category === 'Fine Dining';
+    const handlesGroup = partySize >= 4 ? (venue.category !== 'Hidden Gem' ? 0.25 : -0.15) : 0;
+    const venueKindBonus = venueKind !== 'All' && inferVenueKind(venue) === venueKind ? 0.35 : 0;
+    const servingStyleBonus = servingStyle !== 'All' && inferServingStyle(venue) === servingStyle ? 0.35 : 0;
+    const weatherBonus =
+      weatherMode === 'hot'
+        ? hasCoolVibe || isIndoorLean ? 0.45 : -0.1
+        : weatherMode === 'rainy'
+          ? isIndoorLean ? 0.35 : 0
+          : 0;
 
-  // Pick 3 Distinct Types:
+    return venue.review_score + distanceScore + handlesGroup + weatherBonus + venueKindBonus + servingStyleBonus;
+  };
+
+  candidates.sort((a, b) => scoreVenue(b) - scoreVenue(a));
+
   return {
     timeSpecial: candidates[0] || null,
     nearest: [...candidates].sort((a, b) => calculateDistance(a.coord, userLoc) - calculateDistance(b.coord, userLoc))[0] || null,
-    hiddenGem: candidates.find(v => v.is_hidden_gem) || candidates[Math.min(2, candidates.length - 1)] || null
+    hiddenGem: candidates.find((venue) => venue.is_hidden_gem) || candidates[Math.min(2, candidates.length - 1)] || null
   };
 };
 
