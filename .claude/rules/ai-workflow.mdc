@@ -7,3 +7,9 @@ globs: "*"
 - **NEVER use generic Tailwind styles** like `bg-gray-100` or `shadow-md`. You must configure Tailwind to use the exact colors and custom shadows defined in the workspace (`bg-warm-cream`, `shadow-clay`).
 - If you need a placeholder image, always generate a high-quality relevant image instead of using generic gray blocks or external placeholder APIs (unless specifically asked).
 - Your goal is to WOW the user with a stunning, premium aesthetic. Avoid building simple MVP-looking sub-pages.
+
+## Agent Orchestration & Communication
+- **Frontend Agent**: When requesting a new component or UI update, you MUST automatically cross-reference `.claude/rules/design-system.mdc` to ensure color palette, typography, and shadow tokens are perfectly aligned.
+- **Backend Agent**: When the Frontend agent requests a data-heavy feature (e.g., Tour Planning), you MUST consult the relevant file in `.claude/skills/` (like `dynamic-routing.md`) to provide optimized logic.
+- **Project Manager**: Act as the arbiter of "Sprint Logic". Ensure that all agents follow the patterns defined in the `.claude/` architecture files.
+- **Verification**: Every major task completion must be verified against the corresponding agent persona (`.claude/agents/*.md`) and core rules (`.claude/rules/*.md`).

@@ -39,6 +39,19 @@ export const ITINERARIES = [
       { time: '19:00', name: 'Stop 4: Dinner BBQ', type: 'Progress' },
       // ... more stops
     ]
+  },
+  {
+    id: 'district-9-night',
+    title: 'Làng Đại Học Night',
+    tagline: '22h - 5h • The Study Marathon',
+    description: "District 9's legendary student life. From workspace cafes to silent corners for pre-exam grinds.",
+    gradient: 'from-matcha-600 to-matcha-900',
+    accent: 'matcha-300',
+    stops: [
+      { time: '22:00', name: 'TRẠM 24h', type: 'Workspace', status: 'Focused' },
+      { time: '01:00', name: 'Créma Coffee 24h', type: 'Social Study', status: 'Full Capacity' },
+      { time: '03:30', name: 'KATALI COFFEE', type: 'Chill Out', status: 'Quiet' },
+    ]
   }
 ];
 
@@ -60,5 +73,50 @@ export const VENUES = [
     status: "Booking Required",
     coord: [10.778, 106.702],
     summary: "High-end Twist on traditional flavors."
+  },
+  {
+    id: 3,
+    name: "TRẠM 24h",
+    category: "Street Food",
+    isLocal: true,
+    status: "Active",
+    coord: [10.825, 106.765],
+    summary: "The ultimate student sanctuary in Phước Long B. Quiet, spacious, and open forever."
+  },
+  {
+    id: 4,
+    name: "Trân Kỳ Coffee & Tea",
+    category: "Hidden Gem",
+    isLocal: true,
+    status: "Vibrant",
+    coord: [10.815, 106.775],
+    summary: "Vintage aesthetics meet 24/7 convenience on Đỗ Xuân Hợp."
+  },
+  {
+    id: 5,
+    name: "KATALI COFFEE",
+    category: "Street Food",
+    isLocal: true,
+    status: "Focused",
+    coord: [10.840, 106.772],
+    summary: "Modern vibes and strong energy on the busy Lê Văn Việt strip."
+  },
+  {
+    id: 6,
+    name: "WORKAHOLIC CAFE 24/7",
+    category: "Hidden Gem",
+    isLocal: true,
+    status: "Quiet",
+    coord: [10.845, 106.785],
+    summary: "Dedicated co-working pods and a serious atmosphere for 'running deadlines'."
+  },
+  {
+    id: 7,
+    name: "Créma Coffee 24h",
+    category: "Street Food",
+    isLocal: true,
+    status: "Social",
+    coord: [10.842, 106.781],
+    summary: "The heart of Man Thiện student life. Always bustling, always welcoming."
   }
 ];
