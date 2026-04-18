@@ -1,0 +1,9 @@
+---
+description: Workflow expectations and guidelines for AI coding assistants working in this repository.
+globs: "*"
+---
+# Instructions for AI Assistants
+- Before creating a new component, cross-reference styling with the `DESIGN.md` explicitly.
+- **NEVER use generic Tailwind styles** like `bg-gray-100` or `shadow-md`. You must configure Tailwind to use the exact colors and custom shadows defined in the workspace (`bg-warm-cream`, `shadow-clay`).
+- If you need a placeholder image, always generate a high-quality relevant image instead of using generic gray blocks or external placeholder APIs (unless specifically asked).
+- Your goal is to WOW the user with a stunning, premium aesthetic. Avoid building simple MVP-looking sub-pages.

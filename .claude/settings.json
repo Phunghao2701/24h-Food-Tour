@@ -1,0 +1,11 @@
+{
+  "theme": "clay",
+  "ai": {
+    "preferred_model": "gemini-3.1-pro",
+    "persona": "senior-fullstack-developer"
+  },
+  "project": {
+    "name": "24h Food Tour",
+    "version": "1.0.0"
+  }
+}

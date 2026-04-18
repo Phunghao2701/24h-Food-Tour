@@ -1,0 +1,27 @@
+---
+description: Strict guidelines on colors, typography, layout, and UI animations derived from the Clay design aesthetic.
+globs: src/components/**/*.{js,jsx,ts,tsx}, src/pages/**/*.{js,jsx,ts,tsx}, src/index.css, tailwind.config.js
+---
+# Design System Principles (Strict Adherence Required)
+
+All UI implementations **MUST** strictly adhere to the `DESIGN.md` guidelines. This is a non-negotiable rule.
+
+### Key Visual Principles
+1. **Canvas**: The background must ALWAYS be Warm Cream (`bg-warm-cream` or `#faf9f7`). Never use pure white or cool gray for the page background.
+2. **Borders**: Use Oat Border (`border-oat-border` or `#dad4c8`) for structural lines and cards. Mix solid and dashed lines for a craft-like feel.
+3. **Typography**: The primary font is **Outfit** or **Roobert** (clean, geometric with distinctive stylistic sets).
+   - Display headings MUST use heavy negative letter-spacing (e.g., `tracking-display-tight`).
+   - Use strict weights: 600 for headings, 500 for UI, 400 for body.
+   - Use Uppercase labels (`Uppercase`, `font-semibold`, `tracking-wide-label`, `12px`) extensively for wayfinding.
+4. **Colors (Swatch Palette)**:
+   - Use vibrant named swatches for large background sections or hover states: Matcha (`#078a52`), Slushie (`#3bd3fd`), Lemon (`#fbbd41`), Ube (`#43089f`), Pomegranate (`#fc7981`).
+5. **Border Radius**: Use extremely generous rounding. Feature layouts and containers should be `40px` (`rounded-section`). Cards should be `12px` to `24px` (`rounded-card`, `rounded-feature`). Buttons should be `4px` (ghost), `12px` (standard), or `1584px` (pill).
+6. **Shadows & Depth**:
+   - Standard Card: Multi-layered soft shadow with inset highlight (`shadow-clay`).
+   - Interactive Hover: `shadow-clay-hover` or `rgb(0,0,0) -7px 7px`.
+
+### Signature Interaction (Playful Hover)
+Every primary interactive element (like Buttons or Cards) MUST implement this exact hover behavior (`hover-clay-jump` class):
+- Translate & Rotate: `translateY(-4px)` combined with `rotateZ(-8deg)`.
+- Shadow: Hard offset shadow.
+- Expected behavior: Elements should feel physically playful and "jump" rather than delicately fade.
