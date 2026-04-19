@@ -5,6 +5,31 @@ import { getSmartRecommendations, isVenueOpen } from '../utils/engine';
 
 const ConciergeContext = createContext();
 const DEFAULT_USER_LOC = [10.8411, 106.81];
+const SESSION_KEY = 'concierge_profile';
+
+// Keys to persist in sessionStorage (skip ephemeral UI state)
+const PERSIST_KEYS = ['radiusKm', 'partySize', 'budget', 'venueKind', 'servingStyle', 'userLoc', 'locationReady', 'locationLabel'];
+
+const loadSessionProfile = () => {
+  try {
+    const saved = sessionStorage.getItem(SESSION_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveSessionProfile = (profile) => {
+  try {
+    const toSave = Object.fromEntries(
+      PERSIST_KEYS.filter((k) => profile[k] != null).map((k) => [k, profile[k]])
+    );
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(toSave));
+  } catch {
+    /* silent */
+  }
+};
+
 const DEFAULT_SEARCH_PROFILE = {
   userLoc: DEFAULT_USER_LOC,
   locationLabel: 'Vị trí mặc định',
@@ -29,7 +54,10 @@ export const ConciergeProvider = ({ children }) => {
   const [highlightedVenueIds, setHighlightedVenueIds] = useState([]);
   const [botDraft, setBotDraft] = useState(null);
   const [mapNarrative, setMapNarrative] = useState(null);
-  const [searchProfile, setSearchProfile] = useState(DEFAULT_SEARCH_PROFILE);
+  const [searchProfile, setSearchProfile] = useState(() => ({
+    ...DEFAULT_SEARCH_PROFILE,
+    ...loadSessionProfile(),
+  }));
 
   const findVenueById = useCallback((venueId) => VENUES.find((venue) => venue.id === venueId) || null, []);
 
@@ -93,10 +121,15 @@ export const ConciergeProvider = ({ children }) => {
   }, []);
 
   const updateSearchProfile = useCallback((patch) => {
-    setSearchProfile((prev) => ({ ...prev, ...patch }));
+    setSearchProfile((prev) => {
+      const next = { ...prev, ...patch };
+      saveSessionProfile(next);
+      return next;
+    });
   }, []);
 
   const resetSearchProfile = useCallback(() => {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* silent */ }
     setSearchProfile(DEFAULT_SEARCH_PROFILE);
   }, []);
 
